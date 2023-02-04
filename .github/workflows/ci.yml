@@ -24,10 +24,30 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build Docker image
+        id: docker-image
         uses: docker/build-push-action@v4
         with:
           cache-from: type=gha
-          cache-to: type=gha
+          cache-to: type=gha,type=inline
+          load: true
+          tags: farcasterxyz/hubble:test
+
+      - name: Run Hubble
+        shell: bash
+        run: docker run --rm --detach -p8080:8080 -p9090:9090 farcasterxyz/hubble:test
+
+      - name: Download grpcurl
+        shell: bash
+        run: curl -L https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz -o - | tar -xzf -
+
+      - name: Check that gRPC server is running
+        uses: nick-fields/retry@v2
+        with:
+          timeout_seconds: 10
+          retry_wait_seconds: 5
+          max_attempts: 3
+          shell: bash
+          command: ./grpcurl -plaintext -import-path packages/protobufs/src/schemas -proto packages/protobufs/src/schemas/rpc.proto 127.0.0.1:8080 HubService.GetInfo
 
   analyze:
     timeout-minutes: 10
